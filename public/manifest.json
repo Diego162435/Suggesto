@@ -1,0 +1,21 @@
+{
+    "name": "Suggesto - Suas Recomendações",
+    "short_name": "Suggesto",
+    "description": "Descubra sua próxima paixão em filmes, séries, livros e games.",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#020617",
+    "theme_color": "#2563eb",
+    "icons": [
+        {
+            "src": "/src/assets/logo.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "/src/assets/logo.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}
