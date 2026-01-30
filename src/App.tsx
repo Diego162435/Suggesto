@@ -25,8 +25,9 @@ import { ParentalControlProvider } from './context/ParentalControlContext'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
     const { user, loading } = useAuth()
-    const [isOnboardingComplete, setIsOnboardingComplete] = useState<boolean | null>(null)
     const location = useLocation()
+
+    const [isOnboardingComplete, setIsOnboardingComplete] = useState<boolean | null>(null)
 
     useEffect(() => {
         async function checkOnboarding() {
@@ -35,51 +36,54 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
                 return
             }
 
+            // Sync with localStorage for instant skip
+            const cached = localStorage.getItem(`onboarding_complete_${user.id}`) === 'true'
+            if (cached) {
+                setIsOnboardingComplete(true)
+                return
+            }
+
             try {
-                // Check preferences in profile
-                const { data, error } = await supabase
+                // Return to timeout-based fetch for resilience
+                const profilePromise = supabase
                     .from('profiles')
                     .select('preferences')
                     .eq('id', user.id)
                     .maybeSingle()
 
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Onboarding fetch timeout')), 3000)
+                )
+
+                const { data, error }: any = await Promise.race([profilePromise, timeoutPromise])
+
                 if (error) {
-                    console.warn('Error fetching onboarding status:', error)
-                    // On error, assume onboarding not complete to be safe
-                    setIsOnboardingComplete(false)
+                    console.warn('ProtectedRoute: DB error or missing column during onboarding check:', error)
+                    setIsOnboardingComplete(true) // Don't block
                     return
                 }
 
-                if (!data) {
-                    console.log('No profile found, onboarding required')
-                    setIsOnboardingComplete(false)
-                    return
+                const complete = data?.preferences?.onboarding_completed === true
+                if (complete) {
+                    localStorage.setItem(`onboarding_complete_${user.id}`, 'true')
                 }
-
-                const prefs = (data as any).preferences as any
-                const isComplete = prefs?.onboarding_completed === true
-
-                console.log('Onboarding check:', {
-                    hasPreferences: !!prefs,
-                    onboardingCompleted: prefs?.onboarding_completed,
-                    isComplete
-                })
-
-                setIsOnboardingComplete(isComplete)
+                setIsOnboardingComplete(complete)
             } catch (e) {
-                console.error("Critical onboarding check error", e)
-                setIsOnboardingComplete(false)
+                console.warn("ProtectedRoute: Onboarding check fail or timeout. Proceeding as if complete.", e)
+                setIsOnboardingComplete(true) // Don't block on network issues
             }
         }
 
         checkOnboarding()
-    }, [user])
+    }, [user, location.pathname])
 
     if (loading || (user && isOnboardingComplete === null)) {
         return (
-            <div className="flex h-screen items-center justify-center bg-slate-950 text-white gap-2">
-                <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
-                Carregando...
+            <div className="flex h-screen items-center justify-center bg-slate-950 text-white">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
+                    <span className="text-white/50 text-sm">Carregando portal...</span>
+                </div>
             </div>
         )
     }
@@ -87,12 +91,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     if (!user) return <Navigate to="/auth" replace />
 
     if (isOnboardingComplete === false && location.pathname !== '/onboarding') {
-        console.log('Redirecting to onboarding')
         return <Navigate to="/onboarding" replace />
     }
 
     if (isOnboardingComplete === true && location.pathname === '/onboarding') {
-        console.log('Onboarding complete, redirecting to home')
         return <Navigate to="/" replace />
     }
 
