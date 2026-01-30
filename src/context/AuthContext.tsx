@@ -25,21 +25,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(session?.user ?? null)
 
             if (session?.user) {
+                console.log("Session found for user:", session.user.id);
                 try {
-                    const { data } = await (supabase as any)
+                    // Fetch admin status with a "race" to avoid hanging forever
+                    const profilePromise = supabase
                         .from('profiles')
                         .select('is_admin')
                         .eq('id', session.user.id)
-                        .maybeSingle()
-                    setIsAdmin(!!(data as any)?.is_admin)
+                        .maybeSingle();
+
+                    const timeoutPromise = new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
+                    );
+
+                    const { data, error }: any = await Promise.race([profilePromise, timeoutPromise]);
+
+                    if (error) {
+                        console.warn("AuthContext: Profile fetch returned error (likely missing is_admin column):", error);
+                        setIsAdmin(false);
+                    } else {
+                        setIsAdmin(!!data?.is_admin);
+                    }
                 } catch (err) {
-                    console.error("Admin check error", err)
-                    setIsAdmin(false)
+                    console.warn("AuthContext: Admin check failed or timed out. Defaulting to non-admin.", err);
+                    setIsAdmin(false);
                 }
             } else {
-                setIsAdmin(false)
+                setIsAdmin(false);
             }
-            setLoading(false)
+            console.log("AuthContext: Loading finished.");
+            setLoading(false);
         }
 
         const initAuth = async () => {

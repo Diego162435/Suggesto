@@ -1,5 +1,5 @@
 export const initOneSignal = () => {
-    const ONESIGNAL_APP_ID = "112e8c0a-ac8d-4b41-9743-3dd4a0d191a9";
+    const ONESIGNAL_APP_ID = import.meta.env.VITE_ONESIGNAL_APP_ID;
 
     if (typeof window !== 'undefined') {
         const win = window as any;

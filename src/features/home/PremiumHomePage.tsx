@@ -49,23 +49,45 @@ export function PremiumHomePage() {
     ]
 
     useEffect(() => {
+        // Safety timeout: Never let the loading screen stay more than 5 seconds
+        const safetyTimer = setTimeout(() => {
+            if (loading) {
+                console.warn('PremiumHomePage: Safety timeout hit. Forcing loading to false.');
+                setLoading(false);
+            }
+        }, 5000);
+
         async function loadContent() {
+            console.log('PremiumHomePage: Starting to load content...');
             try {
                 const [trending, community] = await Promise.all([
-                    getTrending('movie').catch(() => []),
-                    getTopCommunityContent(6).catch(() => [])
+                    getTrending('movie').catch(err => {
+                        console.warn('Error fetching trending movies:', err);
+                        return [];
+                    }),
+                    getTopCommunityContent(6).catch(err => {
+                        console.warn('Error fetching community content:', err);
+                        return [];
+                    })
                 ])
+
+                console.log('PremiumHomePage: Content loaded successfully.', {
+                    trendingCount: trending.length,
+                    communityCount: community.length
+                });
 
                 setTrendingContent(trending.slice(0, 12))
                 setTopCommunity(community)
             } catch (error) {
-                console.error('Error loading home content:', error)
+                console.error('PremiumHomePage: Critical error loading content:', error)
             } finally {
                 setLoading(false)
+                clearTimeout(safetyTimer);
             }
         }
 
         loadContent()
+        return () => clearTimeout(safetyTimer);
     }, [])
 
     // Auto-rotate carousel
@@ -140,8 +162,8 @@ export function PremiumHomePage() {
                                 key={index}
                                 onClick={() => setCurrentSlide(index)}
                                 className={`h-1.5 rounded-full transition-all duration-300 ${index === currentSlide
-                                        ? 'bg-white w-8'
-                                        : 'bg-white/30 w-1.5 hover:bg-white/50'
+                                    ? 'bg-white w-8'
+                                    : 'bg-white/30 w-1.5 hover:bg-white/50'
                                     }`}
                             />
                         ))}
